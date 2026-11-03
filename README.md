@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Super Mario 64
 
 - This repo contains a full decompilation of Super Mario 64 of the following releases: Japan (jp), North America (us), Europe (eu), Shindou (sh) and iQue Player (cn).
@@ -190,3 +191,7 @@ discuss what you would like to change.
 Run `clang-format` on your code to ensure it meets the project's coding standards.
 
 Official Discord: [discord.gg/DuYH3Fh](https://discord.gg/DuYH3Fh)
+=======
+# abandoned-gardens-v2.1-decomp
+A decompilation of Abandoned Gardens V2.1 by Team Apotheosis, based on n64decomp/sm64
+>>>>>>> 85bceaa5d4ba3eed5531adb91b4b151bf7ef9732

@@ -478,31 +478,29 @@ s32 act_double_jump(struct MarioState *m) {
 }
 
 s32 act_triple_jump(struct MarioState *m) {
-    if (gSpecialTripleJump) {
-        return set_mario_action(m, ACT_SPECIAL_TRIPLE_JUMP, 0);
+    if ((*(u16 *)((u8 *)m + 2) & 0x2000) == 0){ // lhu $t7, 2($t6)  /* CHANGED */,  andi $t8, $t7, 0x2000  /* CHANGED */, beq $t8, $zero, .act_triple_jump_L8026B850,
+        goto act_triple_jump_L8026B850;
     }
+    set_mario_action(m, 0x0188088A, 0); // in sm64 decomp repo 0x0188088A is ACT_DIVE
+    goto act_triple_jump_L8026B8D0;
 
-    if (m->input & INPUT_B_PRESSED) {
-        return set_mario_action(m, ACT_DIVE, 0);
+    act_triple_jump_L8026B850:
+    if ((*(u16 *)((u8 *)m + 2) & 0x8000) == 0){ // lw $t9, 24($sp), lhu $t0, 2($t9), andi $t1, $t0, 0x8000, beq $t1, $zero, .act_triple_jump_L8026B880
+        goto act_triple_jump_L8026B880;
     }
+    set_mario_action(m, 0x008008A9, 0); // lui $a1, 0x80, ori $a1, $a1, 0x8A9 | -> 0x008008A9, lw $a0, 24($sp), jal 0x80252CF4, move $a2, $zero
+    goto act_triple_jump_L8026B8D0; // 0x008008A9 is ACT_GROUND_POUND in the sm64 decomp repo.
 
-    if (m->input & INPUT_Z_PRESSED) {
-        return set_mario_action(m, ACT_GROUND_POUND, 0);
-    }
+    act_triple_jump_L8026B880: // todo: identify sound id and add it to the decomp
+    play_mario_sound(m, 0x04018081, 0); // lui $a1, 0x400, ori $a1, $a1, 0x8081, lw $a0, 24($sp), jal 0x8025163C, move $a2, $zero
+    //                    ACT_TWIRLING   (sm64 decomp def) 
+    set_mario_action(m, 0x108008A4, 0); // lui $a1, 0x1080, ori $a1, $a1, 0x8A4, lw $a0, 24($sp), jal 0x80252CF4, move $a2, $zero
+    goto act_triple_jump_L8026B8D0;
+    // normally unreachable code snippet between here and act_triple_jump_L8026B8D0:
+    play_flip_sounds(m, 2, 8, 20); // lw $a0, 24($sp), li $a1, 2, li $a2, 8, jal 0x80269F40, li $a3, 20
+    return 0; // move $v0, $zero -> jump into jr $ra
 
-#ifndef VERSION_JP
-    play_mario_sound(m, SOUND_ACTION_TERRAIN_JUMP, 0);
-#else
-    play_mario_sound(m, SOUND_ACTION_TERRAIN_JUMP, SOUND_MARIO_YAHOO);
-#endif
-
-    common_air_action_step(m, ACT_TRIPLE_JUMP_LAND, MARIO_ANIM_TRIPLE_JUMP, 0);
-#if ENABLE_RUMBLE
-    if (m->action == ACT_TRIPLE_JUMP_LAND) {
-        queue_rumble_data(5, 40);
-    }
-#endif
-    play_flip_sounds(m, 2, 8, 20);
+    act_triple_jump_L8026B8D0:
     return FALSE;
 }
 
