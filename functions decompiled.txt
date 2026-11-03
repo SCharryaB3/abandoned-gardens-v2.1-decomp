@@ -1,0 +1,4 @@
+FUNCTIONS DONE: 
+
+act_butt_slide(struct MarioState *m), RAMaddr: 0x80268074 (doesnt match; still calls tilt but no torso tilt in agv2?)
+tilt_body_butt_slide(), RAMaddr: 0x80267C24
