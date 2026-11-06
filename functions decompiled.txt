@@ -4,3 +4,5 @@ act_butt_slide(struct MarioState *m), RAMaddr: 0x80268074 (doesnt match; still c
 tilt_body_butt_slide(), RAMaddr: 0x80267C24
 act_triple_jump(), RAMaddr: 0x8026B814
 todo: figure out what sound 0x04018081 is, its called by act_triple_jump but no match in decomp. for now its just a duplicate of yahoo.
+act_twirling(), RAMaddr: 0x8026C034 (AI WAS USED)
+act_holding_bowser(). accurate! (AI USED)

@@ -156,6 +156,7 @@ SECTIONS
         BUILD_DIR/src/game/mario_actions_airborne.o(.text);
         BUILD_DIR/src/game/mario_actions_submerged.o(.text);
         BUILD_DIR/src/game/mario_actions_object.o(.text);
+        BUILD_DIR/src/custom.o(.text);
         BUILD_DIR/src/game/level_geo.o(.text);
         BUILD_DIR/src/game/mario_misc.o(.text);
         BUILD_DIR/src/game/memory.o(.text);
@@ -640,6 +641,7 @@ SECTIONS
         BUILD_DIR/src/game/mario_actions_moving.o(.data*);
         BUILD_DIR/src/game/mario_actions_submerged.o(.data*);
         BUILD_DIR/src/game/mario_actions_object.o(.data*);
+        BUILD_DIR/src/custom.o(.data*);
         BUILD_DIR/src/game/mario_misc.o(.data*);
         BUILD_DIR/src/game/memory.o(.data*);
         BUILD_DIR/src/game/save_file.o(.data*);
@@ -778,6 +780,7 @@ SECTIONS
         BUILD_DIR/src/game/mario_actions_airborne.o(.rodata*);
         BUILD_DIR/src/game/mario_actions_submerged.o(.rodata*);
         BUILD_DIR/src/game/mario_actions_object.o(.rodata*);
+        BUILD_DIR/src/custom.o(.rodata*);
         BUILD_DIR/src/game/mario_misc.o(.rodata*);
         BUILD_DIR/src/game/memory.o(.rodata*);
         BUILD_DIR/src/game/area.o(.rodata*);
@@ -903,6 +906,7 @@ SECTIONS
         BUILD_DIR/src/game/level_update.o(.bss*);
         BUILD_DIR/src/game/interaction.o(.bss*);
         BUILD_DIR/src/game/mario.o(.bss*);
+        BUILD_DIR/src/custom.o(.bss*);
         BUILD_DIR/src/game/mario_actions_cutscene.o(.bss*);
         BUILD_DIR/src/game/mario_actions_moving.o(.bss*);
         BUILD_DIR/src/game/mario_actions_submerged.o(.bss*);

@@ -675,30 +675,59 @@ s32 act_riding_shell_air(struct MarioState *m) {
     return FALSE;
 }
 
+
 s32 act_twirling(struct MarioState *m) {
     s16 startTwirlYaw = m->twirlYaw;
     s16 yawVelTarget;
 
+    // 0x8026C058
     if (m->input & INPUT_A_DOWN) {
         yawVelTarget = 0x2000;
     } else {
         yawVelTarget = 0x1800;
     }
 
-    m->angleVel[1] = approach_s32(m->angleVel[1], yawVelTarget, 0x200, 0x200);
+    // 0x8026C088
+    m->angleVel[1] = approach_s32(
+        m->angleVel[1],
+        yawVelTarget,
+        0x200,
+        0x200
+    );
+
+    // 0x8026C0A8
     m->twirlYaw += m->angleVel[1];
 
-    set_mario_animation(m, m->actionArg == 0 ? MARIO_ANIM_START_TWIRL : MARIO_ANIM_TWIRL);
-    if (is_anim_past_end(m)) {
+    // 0x8026C0C8
+    set_mario_animation(
+        m,
+        m->actionArg == 0
+            ? MARIO_ANIM_START_TWIRL
+            : MARIO_ANIM_TWIRL
+    );
+
+    /*
+     * AGV2 modification:
+     * Set actionArg when vertical velocity falls below
+     * the floating-point value represented by 0x00C00000.
+     *
+     * This is NOT an animation-end check.
+     */
+    if (m->vel[1] < 1.7632415262334313e-38f) {
         m->actionArg = 1;
     }
-
+    // 0x8026C100
     if (startTwirlYaw > m->twirlYaw) {
-        play_sound(SOUND_ACTION_TWIRL, m->marioObj->header.gfx.cameraToObject);
+        play_sound(
+            0x04398081,
+            m->marioObj->header.gfx.cameraToObject
+        );
     }
 
+    // 0x8026C120
     update_lava_boost_or_twirling(m);
 
+    // 0x8026C12C
     switch (perform_air_step(m, 0)) {
         case AIR_STEP_LANDED:
             set_mario_action(m, ACT_TWIRL_LAND, 0);
@@ -713,10 +742,9 @@ s32 act_twirling(struct MarioState *m) {
             break;
     }
 
+    // 0x8026C1A8
     m->marioObj->header.gfx.angle[1] += m->twirlYaw;
-#if ENABLE_RUMBLE
-    reset_rumble_timers();
-#endif
+
     return FALSE;
 }
 

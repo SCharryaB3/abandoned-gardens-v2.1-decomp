@@ -9,6 +9,7 @@
 #include "interaction.h"
 #include "engine/math_util.h"
 #include "rumble_init.h"
+#include "custom.h"
 
 /**
  * Used by act_punching() to determine Mario's forward velocity during each
@@ -333,90 +334,234 @@ s32 act_picking_up_bowser(struct MarioState *m) {
     return FALSE;
 }
 
+
+
+
+// Raw MarioState memory access.
+// These preserve the offsets observed in AGV2.1 assembly.
+#define MARIO_U16_AT(m, offset) \
+    (*(u16 *)((u8 *)(m) + (offset)))
+
+#define MARIO_S16_AT(m, offset) \
+    (*(s16 *)((u8 *)(m) + (offset)))
+
+#define MARIO_S32_AT(m, offset) \
+    (*(s32 *)((u8 *)(m) + (offset)))
+
+#define MARIO_F32_AT(m, offset) \
+    (*(f32 *)((u8 *)(m) + (offset)))
+
+#define MARIO_PTR_AT(m, offset) \
+    (*(u8 **)((u8 *)(m) + (offset)))
+
+#define BOWSER_OBJ_ANGLE_VEL_Y(obj) \
+    (*(s16 *)((u8 *)(obj) + 26))
+
+
+
 s32 act_holding_bowser(struct MarioState *m) {
-    s16 spin;
+    u8 *objectData;
+    u8 *marioObj;
 
-    if (m->input & INPUT_B_PRESSED) {
-#ifndef VERSION_JP
-        if (m->angleVel[1] <= -0xE00 || m->angleVel[1] >= 0xE00) {
-            play_sound(SOUND_MARIO_SO_LONGA_BOWSER, m->marioObj->header.gfx.cameraToObject);
-        } else {
-            play_sound(SOUND_MARIO_HERE_WE_GO, m->marioObj->header.gfx.cameraToObject);
-        }
-#else
-        play_sound(SOUND_MARIO_HERE_WE_GO, m->marioObj->header.gfx.cameraToObject);
-#endif
-        return set_mario_action(m, ACT_RELEASING_BOWSER, 0);
+    s16 targetAnimSpeed;
+    s16 angularVelocity;
+
+    u16 timer;
+
+    s16 intendedYaw;
+    s16 previousYaw;
+    s16 yawDelta;
+    s32 yawAcceleration;
+
+    s32 checkedValue;
+
+    volatile u16 *customBitfield =
+        (volatile u16 *)0x807E1E34;
+
+
+    // 0x80275B40
+    // Check the custom object data at MarioState + 120.
+    // This changes the maximum angular velocity, not Mario's action.
+
+    targetAnimSpeed = 4096;
+
+    objectData = MARIO_PTR_AT(m, 120);
+
+    if (*(s32 *)(objectData + 324) == 2) {
+        targetAnimSpeed = 6144;
     }
 
-    if (m->angleVel[1] == 0) {
-        if (m->actionTimer++ > 120) {
-            return set_mario_action(m, ACT_RELEASING_BOWSER, 1);
-        }
 
-        set_mario_animation(m, MARIO_ANIM_HOLDING_BOWSER);
+    // 0x80275B68
+    // Check the halfword at MarioState + 2.
+
+    if ((MARIO_U16_AT(m, 2) & 0x2000) != 0) {
+        set_mario_action(m, 0x00000392, 0);
+        return 0;
+    }
+
+
+    // 0x80275B88
+    // Select the holding animation and update the timer.
+
+    angularVelocity = MARIO_S16_AT(m, 52);
+
+    if (angularVelocity != 0) {
+        MARIO_S16_AT(m, 26) = 0;
+
+        set_mario_animation(m, 182);
     } else {
-        m->actionTimer = 0;
-        set_mario_animation(m, MARIO_ANIM_SWINGING_BOWSER);
-    }
+        timer = MARIO_U16_AT(m, 26);
 
-    if (m->intendedMag > 20.0f) {
-        if (m->actionArg == 0) {
-            m->actionArg = 1;
-            m->twirlYaw = m->intendedYaw;
-        } else {
-            // spin = acceleration
-            spin = (s16)(m->intendedYaw - m->twirlYaw) / 0x80;
+        // The assembly increments the timer BEFORE checking
+        // whether the previous value has reached 121.
+        MARIO_U16_AT(m, 26) = (u16)(timer + 1);
 
-            if (spin < -0x80) {
-                spin = -0x80;
-            }
-            if (spin > 0x80) {
-                spin = 0x80;
-            }
-
-            m->twirlYaw = m->intendedYaw;
-            m->angleVel[1] += spin;
-
-            if (m->angleVel[1] > 0x1000) {
-                m->angleVel[1] = 0x1000;
-            }
-            if (m->angleVel[1] < -0x1000) {
-                m->angleVel[1] = -0x1000;
-            }
+        if (timer >= 121) {
+            set_mario_action(m, 0x00000392, 1);
+            return 0;
         }
+
+        set_mario_animation(m, 184);
+    }
+
+
+    // 0x80275BEC
+    // Apply the custom rotational input.
+
+    if (MARIO_F32_AT(m, 32) > 20.0f) {
+
+        // 0x80275C20
+        // Initialize the previous yaw on the first active frame.
+
+        if (MARIO_S32_AT(m, 28) == 0) {
+            MARIO_S32_AT(m, 28) = 1;
+
+            MARIO_S16_AT(m, 58) =
+                MARIO_S16_AT(m, 36);
+        } else {
+
+            // 0x80275C38
+            // Calculate the signed yaw difference.
+
+            intendedYaw = MARIO_S16_AT(m, 36);
+            previousYaw = MARIO_S16_AT(m, 58);
+
+            // The assembly explicitly truncates this result
+            // to a signed 16-bit value.
+            yawDelta = (s16)(intendedYaw - previousYaw);
+
+            // 0x80275C50
+            // Divide by 128, rounding toward zero.
+
+            yawAcceleration = yawDelta / 128;
+
+            // 0x80275C5C
+            // Clamp acceleration to [-128, 128].
+
+            if (yawAcceleration < -128) {
+                yawAcceleration = -128;
+            }
+
+            if (yawAcceleration > 128) {
+                yawAcceleration = 128;
+            }
+
+            // Save the current yaw for the next frame.
+            MARIO_S16_AT(m, 58) = intendedYaw;
+
+            // 0x80275C88
+            // Add the acceleration to angular velocity.
+            // The halfword store wraps the result to 16 bits.
+
+            angularVelocity =
+                (s16)(MARIO_S16_AT(m, 52) + yawAcceleration);
+
+            MARIO_S16_AT(m, 52) = angularVelocity;
+
+            // 0x80275C98
+            // Clamp angular velocity to the selected maximum.
+
+            if (angularVelocity > targetAnimSpeed) {
+                angularVelocity = targetAnimSpeed;
+            }
+
+            if (angularVelocity < -targetAnimSpeed) {
+                angularVelocity = -targetAnimSpeed;
+            }
+
+            MARIO_S16_AT(m, 52) = angularVelocity;
+        }
+
     } else {
-        m->actionArg = 0;
-        m->angleVel[1] = approach_s32(m->angleVel[1], 0, 64, 64);
+
+        // 0x80275CCC
+        // No active rotational input: reset the initialization flag
+        // and gradually approach zero angular velocity.
+
+        MARIO_S32_AT(m, 28) = 0;
+
+        MARIO_S16_AT(m, 52) = (s16)approach_s32(
+            MARIO_S16_AT(m, 52),
+            0,
+            64,
+            64
+        );
     }
 
-    // spin = starting yaw
-    spin = m->faceAngle[1];
-    m->faceAngle[1] += m->angleVel[1];
 
-    // play sound on overflow
-    if (m->angleVel[1] <= -0x100 && spin < m->faceAngle[1]) {
-#if ENABLE_RUMBLE
-        queue_rumble_data(4, 20);
-#endif
-        play_sound(SOUND_OBJ_BOWSER_SPINNING, m->marioObj->header.gfx.cameraToObject);
-    }
-    if (m->angleVel[1] >= 0x100 && spin > m->faceAngle[1]) {
-#if ENABLE_RUMBLE
-        queue_rumble_data(4, 20);
-#endif
-        play_sound(SOUND_OBJ_BOWSER_SPINNING, m->marioObj->header.gfx.cameraToObject);
-    }
+    // 0x80275CE0
+    // Apply angular velocity to Mario's facing yaw.
+
+    angularVelocity = MARIO_S16_AT(m, 52);
+
+    MARIO_S16_AT(m, 46) =
+        (s16)(MARIO_S16_AT(m, 46) + angularVelocity);
+
+
+    // 0x80275CEC
+    // Perform the normal grounded movement/collision step.
 
     stationary_ground_step(m);
-    if (m->angleVel[1] >= 0) {
-        m->marioObj->header.gfx.angle[0] = -m->angleVel[1];
-    } else {
-        m->marioObj->header.gfx.angle[0] = m->angleVel[1];
+
+
+    // 0x80275CF4
+    // Call the custom AGV2.1 routine.
+    // The source halfword is sign-extended, then decremented.
+
+    checkedValue = (s32)(*(volatile s16 *)0x8032DDF4) - 1;
+
+    if (func_807E7CCC(checkedValue) == 0) {
+
+        angularVelocity = MARIO_S16_AT(m, 52);
+
+        if (angularVelocity >= 0) {
+            *customBitfield |= 0x0001;
+        } else {
+            *customBitfield &= 0xFFFE;
+        }
     }
 
-    return FALSE;
+
+    // 0x80275D44
+    // Copy angular velocity into the Mario object's field.
+    // The global bitfield determines its sign.
+
+    marioObj = MARIO_PTR_AT(m, 136);
+
+    if ((*customBitfield & 0x0001) != 0) {
+        BOWSER_OBJ_ANGLE_VEL_Y(marioObj) =
+            (s16)(-MARIO_S16_AT(m, 52));
+    } else {
+        BOWSER_OBJ_ANGLE_VEL_Y(marioObj) =
+            MARIO_S16_AT(m, 52);
+    }
+
+
+    // 0x80275D80
+    return 0;
 }
+
 
 s32 act_releasing_bowser(struct MarioState *m) {
     if (++m->actionTimer == 1) {
